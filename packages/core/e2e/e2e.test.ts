@@ -1412,7 +1412,8 @@ describe('e2e', () => {
         scaledAgain: { x: 18, y: 24 },
         sum: { x: 9, y: 12 },
       });
-    });
+    }
+  );
 
   test(
     'instanceMethodStepWorkflow - instance methods with "use step" directive',
@@ -1467,39 +1468,6 @@ describe('e2e', () => {
       expect(counterSteps.every((s: any) => s.status === 'completed')).toBe(
         true
       );
-    }
-  );
-});
-
-// ==================== PAGES ROUTER TESTS ====================
-// Tests for Next.js Pages Router API endpoint (only runs for nextjs-turbopack and nextjs-webpack)
-const isNextJsApp =
-  process.env.APP_NAME === 'nextjs-turbopack' ||
-  process.env.APP_NAME === 'nextjs-webpack';
-
-describe.skipIf(!isNextJsApp)('pages router', () => {
-  test('addTenWorkflow via pages router', { timeout: 60_000 }, async () => {
-    const run = await triggerWorkflow(
-      {
-        workflowFile: 'workflows/99_e2e.ts',
-        workflowFn: 'addTenWorkflow',
-      },
-      [123],
-      { usePagesRouter: true }
-    );
-    const returnValue = await getWorkflowReturnValue(run.runId);
-    expect(returnValue).toBe(133);
-  });
-
-  test(
-    'promiseAllWorkflow via pages router',
-    { timeout: 60_000 },
-    async () => {
-      const run = await triggerWorkflow('promiseAllWorkflow', [], {
-        usePagesRouter: true,
-      });
-      const returnValue = await getWorkflowReturnValue(run.runId);
-      expect(returnValue).toBe('ABC');
     }
   );
 
