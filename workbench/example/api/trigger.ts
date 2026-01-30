@@ -8,9 +8,19 @@ import workflowManifest from '../manifest.js';
 
 export async function POST(req: Request) {
   const url = new URL(req.url);
-  const workflowFile =
-    url.searchParams.get('workflowFile') || 'workflows/99_e2e.ts';
-  const workflowFn = url.searchParams.get('workflowFn') || 'simple';
+  // New format: workflowId is the full ID like "workflow//./workflows/1_simple//simple"
+  // For backwards compatibility, also support old file/function format
+  let workflowId = url.searchParams.get('workflowId');
+
+  if (!workflowId) {
+    // Legacy format: construct workflow ID from file and function name
+    const workflowFile =
+      url.searchParams.get('workflowFile') || 'workflows/99_e2e.ts';
+    const workflowFn = url.searchParams.get('workflowFn') || 'simple';
+    // Strip .ts extension and construct ID
+    const fileWithoutExt = workflowFile.replace(/\.ts$/, '');
+    workflowId = `workflow//./${fileWithoutExt}//${workflowFn}`;
+  }
 
   let args: any[] = [];
 
@@ -30,17 +40,16 @@ export async function POST(req: Request) {
       args = [42];
     }
   }
-  console.log(
-    `Starting "${workflowFile}/${workflowFn}" workflow with args: ${args}`
-  );
+  console.log(`Starting "${workflowId}" workflow with args: ${args}`);
 
   try {
-    const workflowFileItems =
-      workflowManifest[workflowFile as keyof typeof workflowManifest];
-    const run = await start(
-      workflowFileItems[workflowFn as keyof typeof workflowFileItems],
-      args
-    );
+    // Look up workflow from manifest by ID, or use the ID directly
+    const workflow = workflowManifest[
+      workflowId as keyof typeof workflowManifest
+    ] || {
+      workflowId,
+    };
+    const run = await start(workflow, args);
     console.log('Run:', run.runId);
     return Response.json(run);
   } catch (err) {

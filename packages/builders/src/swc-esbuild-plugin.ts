@@ -5,6 +5,7 @@ import enhancedResolveOrig from 'enhanced-resolve';
 import type { Plugin } from 'esbuild';
 import {
   applySwcTransform,
+  type RawWorkflowManifest,
   type WorkflowManifest,
 } from './apply-swc-transform.js';
 import {
@@ -17,6 +18,53 @@ export interface SwcPluginOptions {
   entriesToBundle?: string[];
   outdir?: string;
   workflowManifest?: WorkflowManifest;
+}
+
+/**
+ * Merge a raw manifest (with source) into the final manifest (with exports).
+ * The condition is determined by the mode:
+ * - step/client mode uses 'default' condition
+ * - workflow mode uses 'workflow' condition
+ */
+function mergeRawManifest(
+  target: WorkflowManifest,
+  raw: RawWorkflowManifest,
+  mode: 'step' | 'workflow' | 'client'
+): void {
+  const condition = mode === 'workflow' ? 'workflow' : 'default';
+
+  // Merge steps
+  if (raw.steps) {
+    if (!target.steps) target.steps = {};
+    for (const [id, data] of Object.entries(raw.steps)) {
+      if (!target.steps[id]) {
+        target.steps[id] = { stepId: id, name: data.name, exports: {} };
+      }
+      target.steps[id].exports[condition] = data.source;
+    }
+  }
+
+  // Merge workflows
+  if (raw.workflows) {
+    if (!target.workflows) target.workflows = {};
+    for (const [id, data] of Object.entries(raw.workflows)) {
+      if (!target.workflows[id]) {
+        target.workflows[id] = { workflowId: id, name: data.name, exports: {} };
+      }
+      target.workflows[id].exports[condition] = data.source;
+    }
+  }
+
+  // Merge classes
+  if (raw.classes) {
+    if (!target.classes) target.classes = {};
+    for (const [id, data] of Object.entries(raw.classes)) {
+      if (!target.classes[id]) {
+        target.classes[id] = { classId: id, name: data.name, exports: {} };
+      }
+      target.classes[id].exports[condition] = data.source;
+    }
+  }
 }
 
 const NODE_RESOLVE_OPTIONS = {
@@ -215,17 +263,11 @@ export function createSwcPlugin(options: SwcPluginOptions): Plugin {
             options.workflowManifest = {};
           }
 
-          options.workflowManifest.workflows = Object.assign(
-            options.workflowManifest.workflows || {},
-            workflowManifest.workflows
-          );
-          options.workflowManifest.steps = Object.assign(
-            options.workflowManifest.steps || {},
-            workflowManifest.steps
-          );
-          options.workflowManifest.classes = Object.assign(
-            options.workflowManifest.classes || {},
-            workflowManifest.classes
+          // Merge raw manifest into final manifest with exports keyed by condition
+          mergeRawManifest(
+            options.workflowManifest,
+            workflowManifest,
+            options.mode
           );
 
           return {

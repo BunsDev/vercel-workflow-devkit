@@ -10,6 +10,7 @@ import { findUp } from 'find-up';
 import { glob } from 'tinyglobby';
 import {
   applySwcTransform,
+  type RawWorkflowManifest,
   type WorkflowManifest,
 } from './apply-swc-transform.js';
 import { createDiscoverEntriesPlugin } from './discover-entries-esbuild-plugin.js';
@@ -23,6 +24,48 @@ const enhancedResolve = promisify(enhancedResolveOriginal);
 
 const EMIT_SOURCEMAPS_FOR_DEBUGGING =
   process.env.WORKFLOW_EMIT_SOURCEMAPS_FOR_DEBUGGING === '1';
+
+/**
+ * Merge a raw manifest (with source) into the final manifest (with exports).
+ */
+function mergeRawManifest(
+  target: WorkflowManifest,
+  raw: RawWorkflowManifest,
+  condition: 'default' | 'workflow'
+): void {
+  // Merge steps
+  if (raw.steps) {
+    if (!target.steps) target.steps = {};
+    for (const [id, data] of Object.entries(raw.steps)) {
+      if (!target.steps[id]) {
+        target.steps[id] = { stepId: id, name: data.name, exports: {} };
+      }
+      target.steps[id].exports[condition] = data.source;
+    }
+  }
+
+  // Merge workflows
+  if (raw.workflows) {
+    if (!target.workflows) target.workflows = {};
+    for (const [id, data] of Object.entries(raw.workflows)) {
+      if (!target.workflows[id]) {
+        target.workflows[id] = { workflowId: id, name: data.name, exports: {} };
+      }
+      target.workflows[id].exports[condition] = data.source;
+    }
+  }
+
+  // Merge classes
+  if (raw.classes) {
+    if (!target.classes) target.classes = {};
+    for (const [id, data] of Object.entries(raw.classes)) {
+      if (!target.classes[id]) {
+        target.classes[id] = { classId: id, name: data.name, exports: {} };
+      }
+      target.classes[id].exports[condition] = data.source;
+    }
+  }
+}
 
 /**
  * Base class for workflow builders. Provides common build logic for transforming
@@ -441,23 +484,13 @@ export abstract class BaseBuilder {
         try {
           const source = await readFile(workflowFile, 'utf8');
           const relativeFilepath = this.getRelativeFilepath(workflowFile);
-          const { workflowManifest: fileManifest } = await applySwcTransform(
+          const { workflowManifest: rawManifest } = await applySwcTransform(
             relativeFilepath,
             source,
             'workflow'
           );
-          if (fileManifest.workflows) {
-            workflowManifest.workflows = Object.assign(
-              workflowManifest.workflows || {},
-              fileManifest.workflows
-            );
-          }
-          if (fileManifest.classes) {
-            workflowManifest.classes = Object.assign(
-              workflowManifest.classes || {},
-              fileManifest.classes
-            );
-          }
+          // Merge with 'workflow' condition since these are workflow-only files
+          mergeRawManifest(workflowManifest, rawManifest, 'workflow');
         } catch (error) {
           // Log warning but continue - don't fail build for workflow-only file issues
           console.log(
@@ -1017,6 +1050,20 @@ export const OPTIONS = handler;`;
   /**
    * Creates a manifest JSON file containing step/workflow/class metadata
    * and graph data for visualization.
+   *
+   * Output format (ID-keyed):
+   * {
+   *   "version": "1.0.0",
+   *   "steps": {
+   *     "step//pkg@1.0.0//add": { "name": "add", "source": "path/file.ts" }
+   *   },
+   *   "workflows": {
+   *     "workflow//./src/order//process": { "name": "process", "source": "...", "graph": {...} }
+   *   },
+   *   "classes": {
+   *     "class//pkg@1.0.0//Point": { "name": "Point", "source": "..." }
+   *   }
+   * }
    */
   protected async createManifest({
     workflowBundlePath,
@@ -1033,14 +1080,18 @@ export const OPTIONS = handler;`;
     try {
       const workflowGraphs = await extractWorkflowGraphs(workflowBundlePath);
 
-      const steps = this.convertStepsManifest(manifest.steps);
-      const workflows = this.convertWorkflowsManifest(
+      // Add graph data to workflows
+      const workflows = this.addGraphsToWorkflows(
         manifest.workflows,
         workflowGraphs
       );
-      const classes = this.convertClassesManifest(manifest.classes);
 
-      const output = { version: '1.0.0', steps, workflows, classes };
+      const output = {
+        version: '1.0.0',
+        steps: manifest.steps || {},
+        workflows,
+        classes: manifest.classes || {},
+      };
 
       await mkdir(manifestDir, { recursive: true });
       await writeFile(
@@ -1048,18 +1099,9 @@ export const OPTIONS = handler;`;
         JSON.stringify(output, null, 2)
       );
 
-      const stepCount = Object.values(steps).reduce(
-        (acc, s) => acc + Object.keys(s).length,
-        0
-      );
-      const workflowCount = Object.values(workflows).reduce(
-        (acc, w) => acc + Object.keys(w).length,
-        0
-      );
-      const classCount = Object.values(classes).reduce(
-        (acc, c) => acc + Object.keys(c).length,
-        0
-      );
+      const stepCount = Object.keys(output.steps || {}).length;
+      const workflowCount = Object.keys(output.workflows || {}).length;
+      const classCount = Object.keys(output.classes || {}).length;
 
       console.log(
         `Created manifest with ${stepCount} ${pluralize('step', 'steps', stepCount)}, ${workflowCount} ${pluralize('workflow', 'workflows', workflowCount)}, and ${classCount} ${pluralize('class', 'classes', classCount)}`,
@@ -1073,67 +1115,34 @@ export const OPTIONS = handler;`;
     }
   }
 
-  private convertStepsManifest(
-    steps: WorkflowManifest['steps']
-  ): Record<string, Record<string, { stepId: string }>> {
-    const result: Record<string, Record<string, { stepId: string }>> = {};
-    if (!steps) return result;
-
-    for (const [filePath, entries] of Object.entries(steps)) {
-      result[filePath] = {};
-      for (const [name, data] of Object.entries(entries)) {
-        result[filePath][name] = { stepId: data.stepId };
-      }
-    }
-    return result;
-  }
-
-  private convertWorkflowsManifest(
+  /**
+   * Add graph data to workflows based on extracted graphs from the bundle.
+   * The graphs are keyed by source file and function name, so we need to match them.
+   */
+  private addGraphsToWorkflows(
     workflows: WorkflowManifest['workflows'],
     graphs: Record<
       string,
-      Record<string, { graph: { nodes: any[]; edges: any[] } }>
+      Record<string, { graph: { nodes: unknown[]; edges: unknown[] } }>
     >
-  ): Record<
-    string,
-    Record<
-      string,
-      { workflowId: string; graph: { nodes: any[]; edges: any[] } }
-    >
-  > {
-    const result: Record<
-      string,
-      Record<
-        string,
-        { workflowId: string; graph: { nodes: any[]; edges: any[] } }
-      >
-    > = {};
-    if (!workflows) return result;
+  ): WorkflowManifest['workflows'] {
+    if (!workflows) return {};
 
-    for (const [filePath, entries] of Object.entries(workflows)) {
-      result[filePath] = {};
-      for (const [name, data] of Object.entries(entries)) {
-        result[filePath][name] = {
-          workflowId: data.workflowId,
-          graph: graphs[filePath]?.[name]?.graph || { nodes: [], edges: [] },
-        };
-      }
+    const result: WorkflowManifest['workflows'] = {};
+
+    for (const [workflowId, data] of Object.entries(workflows)) {
+      const { name, exports } = data;
+      // Look up graph by source file (use 'workflow' export) and function name
+      const source = exports.workflow;
+      const graph = source
+        ? graphs[source]?.[name]?.graph || { nodes: [], edges: [] }
+        : { nodes: [], edges: [] };
+      result[workflowId] = {
+        ...data,
+        graph,
+      };
     }
-    return result;
-  }
 
-  private convertClassesManifest(
-    classes: WorkflowManifest['classes']
-  ): Record<string, Record<string, { classId: string }>> {
-    const result: Record<string, Record<string, { classId: string }>> = {};
-    if (!classes) return result;
-
-    for (const [filePath, entries] of Object.entries(classes)) {
-      result[filePath] = {};
-      for (const [name, data] of Object.entries(entries)) {
-        result[filePath][name] = { classId: data.classId };
-      }
-    }
     return result;
   }
 }
