@@ -496,9 +496,10 @@ export abstract class BaseBuilder {
     outfile: string;
     format?: 'cjs' | 'esm';
     bundleFinalOutput?: boolean;
-  }): Promise<void | {
-    interimBundleCtx: esbuild.BuildContext;
-    bundleFinal: (interimBundleResult: string) => Promise<void>;
+  }): Promise<{
+    manifest: WorkflowManifest;
+    interimBundleCtx?: esbuild.BuildContext;
+    bundleFinal?: (interimBundleResult: string) => Promise<void>;
   }> {
     const {
       discoveredWorkflows: workflowFiles,
@@ -720,11 +721,13 @@ export const POST = workflowEntrypoint(workflowCode);`;
 
     if (this.config.watch) {
       return {
+        manifest: workflowManifest,
         interimBundleCtx,
         bundleFinal,
       };
     }
     await interimBundleCtx.dispose();
+    return { manifest: workflowManifest };
   }
 
   /**

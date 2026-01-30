@@ -204,7 +204,12 @@ export function createSwcPlugin(options: SwcPluginOptions): Plugin {
           }
 
           const { code: transformedCode, workflowManifest } =
-            await applySwcTransform(relativeFilepath, source, options.mode);
+            await applySwcTransform(
+              relativeFilepath,
+              source,
+              options.mode,
+              args.path // Pass absolute path for module specifier resolution
+            );
 
           if (!options.workflowManifest) {
             options.workflowManifest = {};
