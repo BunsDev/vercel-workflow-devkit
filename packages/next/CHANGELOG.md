@@ -1,5 +1,15 @@
 # @workflow/next
 
+## 5.0.0-beta.43
+
+### Patch Changes
+
+- [#3529](https://github.com/vercel/workflow/pull/3529) [`ae16375`](https://github.com/vercel/workflow/commit/ae1637502b35c8f635d2b0e103cd8de85b5ffcdd) Thanks [@alangenfeld](https://github.com/alangenfeld)! - Fix dev HMR dropping edits to already-tracked files that land while a full rediscovery rebuild is in flight; the post-rebuild baseline refresh absorbed such edits so their watcher events classified as no-ops and the change never reached the manifest. Files first discovered by the in-flight rebuild narrow the same race but a create-then-edit within one rebuild window can still be absorbed.
+
+- Updated dependencies [[`b0adb50`](https://github.com/vercel/workflow/commit/b0adb50bce623b23252735021205e8d870a2b11f), [`1321570`](https://github.com/vercel/workflow/commit/13215704645ea487ef6f8821016ec3f13c1cd830), [`234d3dd`](https://github.com/vercel/workflow/commit/234d3dd7b852129e189d321314c4f749f12711d8)]:
+  - @workflow/core@5.0.0-beta.43
+  - @workflow/builders@5.0.0-beta.43
+
 ## 5.0.0-beta.42
 
 ### Patch Changes

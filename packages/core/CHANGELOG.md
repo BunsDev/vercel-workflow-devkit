@@ -1,5 +1,21 @@
 # @workflow/core
 
+## 5.0.0-beta.43
+
+### Patch Changes
+
+- [#3025](https://github.com/vercel/workflow/pull/3025) [`b0adb50`](https://github.com/vercel/workflow/commit/b0adb50bce623b23252735021205e8d870a2b11f) Thanks [@pranaygp](https://github.com/pranaygp)! - Batched event writes: add the optional `events.createBatch` World API (ordered events, one durable write, per-event outcomes), implement it in `@workflow/world-vercel` against `POST /v4/runs/:runId/events/batch` (slot-identity runs only), and fold clean suspension fan-outs — eager `step_created` and `wait_created` writes — into batched writes in the runtime. On by default; disable with `WORKFLOW_BATCH_TRANSITIONS=0`.
+
+- [#3497](https://github.com/vercel/workflow/pull/3497) [`1321570`](https://github.com/vercel/workflow/commit/13215704645ea487ef6f8821016ec3f13c1cd830) Thanks [@VaguelySerious](https://github.com/VaguelySerious)! - Log ignored duplicate events at `debug` instead of `info`/`error`, so a straggler no longer prints on every replay of the run.
+
+- [#3560](https://github.com/vercel/workflow/pull/3560) [`234d3dd`](https://github.com/vercel/workflow/commit/234d3dd7b852129e189d321314c4f749f12711d8) Thanks [@alangenfeld](https://github.com/alangenfeld)! - Add a run-pickup watchdog to the e2e harness: a started run still pending after a budget is replaced (side-effect-free) and recorded as an infra event surfaced separately from test failures and flaky retries.
+
+- Updated dependencies [[`b0adb50`](https://github.com/vercel/workflow/commit/b0adb50bce623b23252735021205e8d870a2b11f), [`1321570`](https://github.com/vercel/workflow/commit/13215704645ea487ef6f8821016ec3f13c1cd830)]:
+  - @workflow/world@5.0.0-beta.28
+  - @workflow/world-vercel@5.0.0-beta.39
+  - @workflow/errors@5.0.0-beta.17
+  - @workflow/world-local@5.0.0-beta.37
+
 ## 5.0.0-beta.42
 
 ### Minor Changes
