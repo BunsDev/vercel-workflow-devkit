@@ -1,5 +1,24 @@
 # workflow
 
+## 5.0.0-beta.43
+
+### Patch Changes
+
+- [#3497](https://github.com/vercel/workflow/pull/3497) [`1321570`](https://github.com/vercel/workflow/commit/13215704645ea487ef6f8821016ec3f13c1cd830) Thanks [@VaguelySerious](https://github.com/VaguelySerious)! - Log ignored duplicate events at `debug` instead of `info`/`error`, so a straggler no longer prints on every replay of the run.
+
+- Updated dependencies [[`b0adb50`](https://github.com/vercel/workflow/commit/b0adb50bce623b23252735021205e8d870a2b11f), [`ae16375`](https://github.com/vercel/workflow/commit/ae1637502b35c8f635d2b0e103cd8de85b5ffcdd), [`1321570`](https://github.com/vercel/workflow/commit/13215704645ea487ef6f8821016ec3f13c1cd830), [`234d3dd`](https://github.com/vercel/workflow/commit/234d3dd7b852129e189d321314c4f749f12711d8)]:
+  - @workflow/core@5.0.0-beta.43
+  - @workflow/next@5.0.0-beta.43
+  - @workflow/cli@5.0.0-beta.43
+  - @workflow/errors@5.0.0-beta.17
+  - @workflow/nitro@5.0.0-beta.43
+  - @workflow/typescript-plugin@5.0.0-beta.5
+  - @workflow/astro@5.0.0-beta.43
+  - @workflow/nest@5.0.0-beta.43
+  - @workflow/rollup@5.0.0-beta.43
+  - @workflow/sveltekit@5.0.0-beta.43
+  - @workflow/nuxt@5.0.0-beta.43
+
 ## 5.0.0-beta.42
 
 ### Patch Changes
